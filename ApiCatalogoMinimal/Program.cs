@@ -18,7 +18,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var app = builder.Build();
 
-app.MapGet("/", () => "Catálogo de Produtos - 2026");
+//-------Endpoints-Categoria----------//
+app.MapGet("/", () => "Catálogo de Produtos - 2026").ExcludeFromDescription();
 
 app.MapPost("/categorias", async ([FromBody]Categoria categoria, [FromServices]AppDbContext db) =>
 {
@@ -37,7 +38,92 @@ app.MapGet("/categoria/{id:int}", async(int id, AppDbContext db) =>
                                : Results.NotFound();
 });
 
-app.MapPut("/categorias/{id:int}", async());
+app.MapPut("/categorias/{id:int}", async(int id, [FromBody]Categoria categoria, AppDbContext db) =>
+{
+    if(categoria.CategoriaId != id)
+        return Results.BadRequest();
+
+    var categoriaDB = await db.Categorias.FindAsync(id);
+
+    if(categoriaDB is null)
+        return Results.NotFound();
+
+    categoriaDB.Nome = categoria.Nome;
+    categoriaDB.Descricao = categoria.Descricao;
+
+    await db.SaveChangesAsync();
+    return Results.Ok(categoriaDB);
+});
+
+app.MapDelete("/categorias/{id:int}", async (int id, AppDbContext db) =>
+{
+    var categoria = await db.Categorias.FindAsync(id);
+
+    if (categoria is null)
+        return Results.NotFound();
+
+    db.Categorias.Remove(categoria);
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
+});
+
+//-------Endpoints-Produtos---------//
+app.MapGet("/produtos", async([FromServices]AppDbContext db) =>
+{
+    return await db.Produtos.ToListAsync();
+});
+
+app.MapGet("/produtos/{id:int}", async(int id, [FromServices]AppDbContext db) =>
+{
+    return await db.Produtos.FindAsync(id)
+        is Produto produto ? Results.Ok(produto)
+                           : Results.NotFound();
+});
+
+app.MapPost("/produtos", async ([FromBody] Produto produto, [FromServices] AppDbContext db) =>
+{
+    db.Produtos.Add(produto);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"$/categorias/{produto.ProdutoId}", produto);
+});
+
+app.MapPut("/produtos/{id:int}", async(int id, [FromBody]Produto produto, [FromServices]AppDbContext db) =>
+{
+    if (produto.ProdutoId != id)
+        return Results.BadRequest();
+
+    var produtoDB = await db.Produtos.FindAsync(id);
+
+    if(produtoDB is null)
+        return Results.NotFound();
+
+    produtoDB.Nome = produto.Nome;
+    produtoDB.Descricao = produto.Descricao;
+    produtoDB.Preco = produto.Preco;
+    produtoDB.Imagem = produto.Imagem;
+    produtoDB.DataCompra = produto.DataCompra;
+    produtoDB.Estoque = produto.Estoque;
+    produtoDB.CategoriaId = produto.CategoriaId;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(produtoDB);
+});
+
+app.MapDelete("/produtos/{id:int}", async(int id, AppDbContext db) =>
+{
+    var produtoDB = await db.Produtos.FindAsync(id);
+
+    if (produtoDB is null)
+        return Results.NotFound();
+
+    db.Produtos.Remove(produtoDB);
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
